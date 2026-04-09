@@ -101,17 +101,20 @@ st.title("🎬 Pro Slideshow Video Studio")
 if concatenate_videoclips is None:
     st.error("⚠️ MoviePy library not detected!")
     st.markdown("""
-    ### How to fix this:
-    1. Create a file named **`requirements.txt`** in your GitHub repository.
-    2. Paste these lines inside it:
+    ### 🛠️ Important Fix Required:
+    Aapki app ko chalne ke liye kuch libraries ki zaroorat hai jo abhi install nahi hain.
+    
+    **Ye steps follow karein:**
+    1. Apni GitHub repository mein ek nayi file banayein jis ka naam **`requirements.txt`** rakhein.
+    2. Us file ke andar ye charo (4) lines copy karke paste kar dein:
        ```text
        streamlit
        moviepy
        numpy
        Pillow
        ```
-    3. Save (Commit) the file.
-    4. On Streamlit Cloud, click **Manage App** -> **Reboot App**.
+    3. File ko **Commit (Save)** karein.
+    4. Streamlit dashboard par ja kar **Manage App** par click karein aur phir **Reboot App** kar dein.
     """)
     st.stop()
 
