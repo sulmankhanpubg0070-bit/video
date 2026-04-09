@@ -2,6 +2,7 @@ import streamlit as st
 import os
 
 # Robust import handling for MoviePy v1 and v2
+# We try multiple ways to find the correct concatenate function
 try:
     from moviepy.editor import ImageClip, CompositeVideoClip, concatenate_videoclips, TextClip
 except ImportError:
@@ -10,13 +11,16 @@ except ImportError:
         from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
         from moviepy.video.compositing.concatenate import concatenate_videoclips
     except ImportError:
-        # This will show if requirements.txt is missing or hasn't finished installing
-        st.error("MoviePy library not found. Please ensure 'moviepy' is in your requirements.txt and the app has finished deployment.")
-        # Define placeholders to prevent NameError before the app stops
-        ImageClip = CompositeVideoClip = concatenate_videoclips = TextClip = None
+        # Final fallback attempt for newer structures
+        try:
+            from moviepy import ImageClip, TextClip, CompositeVideoClip, concatenate_videoclips
+        except ImportError:
+            st.error("MoviePy library is not yet installed on the server. Please check your requirements.txt and wait for deployment to finish.")
+            ImageClip = CompositeVideoClip = concatenate_videoclips = TextClip = None
 
 # Helper function to handle MoviePy v1 vs v2 method naming differences
 def apply_attribute(clip, attr_v1, attr_v2, value):
+    if clip is None: return None
     if hasattr(clip, attr_v2): # MoviePy v2.0+ (e.g., with_duration)
         return getattr(clip, attr_v2)(value)
     elif hasattr(clip, attr_v1): # MoviePy v1.0 (e.g., set_duration)
@@ -42,7 +46,7 @@ if uploaded_files:
         if not uploaded_files:
             st.error("Please upload some images first!")
         elif concatenate_videoclips is None:
-            st.error("MoviePy is not properly installed. Check your requirements.txt")
+            st.error("MoviePy is not properly installed. Please ensure 'moviepy' is in your requirements.txt and REBOOT the app from the Streamlit dashboard.")
         else:
             with st.spinner("Processing video... this might take a minute."):
                 try:
@@ -97,7 +101,6 @@ if uploaded_files:
                         clips.append(video_segment)
 
                     # Combine and write
-                    # Using the correctly imported concatenate_videoclips
                     final_video = concatenate_videoclips(clips, method="compose")
                     output_path = "output_video.mp4"
                     
