@@ -12,7 +12,6 @@ except ImportError:
         from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
         from moviepy.video.compositing.concatenate import concatenate_videoclips
     except ImportError:
-        st.error("MoviePy library not found. Please add 'moviepy' to your requirements.txt")
         ImageClip = CompositeVideoClip = concatenate_videoclips = None
 
 # Helper function to handle MoviePy v1 vs v2 method naming differences
@@ -73,7 +72,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom Styling
+# Custom Styling - FIXED unsafe_allow_html
 st.markdown("""
     <style>
     .main {
@@ -94,9 +93,14 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     </style>
-    """, unsafe_allow_stdio=True)
+    """, unsafe_allow_html=True)
 
 st.title("🎬 Pro Slideshow Video Studio")
+
+if concatenate_videoclips is None:
+    st.error("⚠️ MoviePy library not found! Please ensure 'moviepy' is in your requirements.txt file and the app has finished installing dependencies.")
+    st.stop()
+
 st.markdown("---")
 
 # Layout with two columns
@@ -119,72 +123,69 @@ with col2:
 if uploaded_files:
     st.markdown("---")
     if st.button("🚀 Generate High-Quality Video"):
-        if concatenate_videoclips is None:
-            st.error("MoviePy installation error. Please check requirements.txt")
-        else:
-            progress_bar = st.progress(0)
-            status_text = st.empty()
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        try:
+            clips = []
+            temp_files = []
+            total_files = len(uploaded_files)
+
+            for i, file in enumerate(uploaded_files):
+                status_text.text(f"Processing image {i+1} of {total_files}...")
+                
+                img_path = f"temp_{i}.jpg"
+                with open(img_path, "wb") as f:
+                    f.write(file.getbuffer())
+                temp_files.append(img_path)
+
+                # Process with Pillow
+                with Image.open(img_path) as main_img:
+                    main_img = main_img.convert("RGB")
+                    
+                    # High-quality resize
+                    main_img = main_img.resize((1280, 720), Image.Resampling.LANCZOS)
+                    w, h = main_img.size
+                    
+                    # Add Text Overlay
+                    text_layer = create_text_overlay_pill(labels[i], w, h)
+                    
+                    # Merge text bar onto image
+                    final_frame_pil = Image.fromarray(text_layer)
+                    main_img.paste(final_frame_pil, (0,0), mask=None) 
+                    
+                    # Convert to MoviePy
+                    img_array = np.array(main_img)
+                    img_clip = ImageClip(img_array)
+                    img_clip = apply_attribute(img_clip, "set_duration", "with_duration", 3)
+                    
+                    clips.append(img_clip)
+                
+                progress_bar.progress((i + 1) / total_files * 0.5)
+
+            status_text.text("Merging clips into final video...")
+            final_video = concatenate_videoclips(clips, method="compose")
+            output_path = "final_slideshow.mp4"
             
-            try:
-                clips = []
-                temp_files = []
-                total_files = len(uploaded_files)
+            # Write file with professional settings
+            final_video.write_videofile(output_path, fps=24, codec="libx264", preset="medium")
+            progress_bar.progress(1.0)
+            
+            st.success("✨ Your video is ready!")
+            st.video(output_path)
+            
+            # Download Button
+            with open(output_path, "rb") as file:
+                st.download_button(
+                    label="💾 Download Video",
+                    data=file,
+                    file_name="my_slideshow.mp4",
+                    mime="video/mp4"
+                )
 
-                for i, file in enumerate(uploaded_files):
-                    status_text.text(f"Processing image {i+1} of {total_files}...")
-                    
-                    img_path = f"temp_{i}.jpg"
-                    with open(img_path, "wb") as f:
-                        f.write(file.getbuffer())
-                    temp_files.append(img_path)
+            # Cleanup
+            for f in temp_files:
+                if os.path.exists(f): os.remove(f)
 
-                    # Process with Pillow
-                    with Image.open(img_path) as main_img:
-                        main_img = main_img.convert("RGB")
-                        
-                        # High-quality resize (Maintain Aspect Ratio logic could be added, but 720p is safe)
-                        main_img = main_img.resize((1280, 720), Image.Resampling.LANCZOS)
-                        w, h = main_img.size
-                        
-                        # Add Text Overlay
-                        text_layer = create_text_overlay_pill(labels[i], w, h)
-                        
-                        # Merge text bar onto image
-                        final_frame_pil = Image.fromarray(text_layer)
-                        main_img.paste(final_frame_pil, (0,0), mask=None) 
-                        
-                        # Convert to MoviePy
-                        img_array = np.array(main_img)
-                        img_clip = ImageClip(img_array)
-                        img_clip = apply_attribute(img_clip, "set_duration", "with_duration", 3)
-                        
-                        clips.append(img_clip)
-                    
-                    progress_bar.progress((i + 1) / total_files * 0.5)
-
-                status_text.text("Merging clips into final video...")
-                final_video = concatenate_videoclips(clips, method="compose")
-                output_path = "final_slideshow.mp4"
-                
-                # Write file with professional settings
-                final_video.write_videofile(output_path, fps=24, codec="libx264", preset="medium")
-                progress_bar.progress(1.0)
-                
-                st.success("✨ Your video is ready!")
-                st.video(output_path)
-                
-                # Download Button
-                with open(output_path, "rb") as file:
-                    st.download_button(
-                        label="💾 Download Video",
-                        data=file,
-                        file_name="my_slideshow.mp4",
-                        mime="video/mp4"
-                    )
-
-                # Cleanup
-                for f in temp_files:
-                    if os.path.exists(f): os.remove(f)
-
-            except Exception as err:
-                st.error(f"Something went wrong: {err}")
+        except Exception as err:
+            st.error(f"Something went wrong: {err}")
