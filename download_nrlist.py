@@ -1,29 +1,33 @@
-"""
+import streamlit as st
+from moviepy.editor import ImageClip, CompositeVideoClip, concatenate_videoclips, TextClip
 
-A sample python script for downloading the current non-redundant lists from
-the RNA 3D Hub (http://rna.bgsu.edu/rna3dhub).
+st.title("📸 Slideshow Video Generator")
 
-Usage:
-python download_nrlist.py
+uploaded_files = st.file_uploader("Upload Images", accept_multiple_files=True)
 
-"""
+labels = []
 
-import urllib2
+if uploaded_files:
+    for i, file in enumerate(uploaded_files):
+        label = st.text_input(f"Label for {file.name}", key=i)
+        labels.append(label)
 
+    if st.button("Generate Video"):
+        clips = []
 
-# nrlist are provided at 8 resolution cutoffs
-resolutions = ['1.5A', '2.0A', '2.5A', '3.0A', '3.5A', '4.0A', '20.0A', 'all']
+        for i, file in enumerate(uploaded_files):
+            img_path = f"temp_{i}.jpg"
+            with open(img_path, "wb") as f:
+                f.write(file.read())
 
-base_url = 'http://rna.bgsu.edu/rna3dhub/nrlist/download'
+            img_clip = ImageClip(img_path).set_duration(3)
 
-for resolution in resolutions:
-    release = 'current' # can be replaced with a specific release id, e.g. 0.70
-    url = '/'.join([base_url, release, resolution])
-    try:
-        nrdata = urllib2.urlopen( url ).read()
-        # nrdata now contains the string with data in csv format
-        print "Release %s, resolution %s: download complete" % \
-              (release, resolution)
-    except:
-        print "Release %s, resolution %s: download failed" % \
-              (release, resolution)
+            txt_clip = TextClip(labels[i], fontsize=50, color='white', bg_color='black')
+            txt_clip = txt_clip.set_position(("center", "bottom")).set_duration(3)
+
+            clips.append(CompositeVideoClip([img_clip, txt_clip]))
+
+        final = concatenate_videoclips(clips, method="compose")
+        final.write_videofile("output.mp4", fps=24)
+
+        st.video("output.mp4")
