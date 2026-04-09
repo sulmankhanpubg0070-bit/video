@@ -1,2 +1,4 @@
-ffmpeg
-imagemagick
+streamlit
+moviepy
+numpy
+Pillow
