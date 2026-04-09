@@ -97,8 +97,22 @@ st.markdown("""
 
 st.title("🎬 Pro Slideshow Video Studio")
 
+# Check if MoviePy is missing
 if concatenate_videoclips is None:
-    st.error("⚠️ MoviePy library not found! Please ensure 'moviepy' is in your requirements.txt file and the app has finished installing dependencies.")
+    st.error("⚠️ MoviePy library not detected!")
+    st.markdown("""
+    ### How to fix this:
+    1. Create a file named **`requirements.txt`** in your GitHub repository.
+    2. Paste these lines inside it:
+       ```text
+       streamlit
+       moviepy
+       numpy
+       Pillow
+       ```
+    3. Save (Commit) the file.
+    4. On Streamlit Cloud, click **Manage App** -> **Reboot App**.
+    """)
     st.stop()
 
 st.markdown("---")
