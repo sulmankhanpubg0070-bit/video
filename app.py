@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 
-# Robust import handling for MoviePy
+# Robust import handling for MoviePy v1 and v2
 try:
     from moviepy.editor import ImageClip, CompositeVideoClip, concatenate_videoclips, TextClip
 except ImportError:
@@ -10,7 +10,16 @@ except ImportError:
         from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
         from moviepy.video.compositing.concatenate import concatenate_videoclips
     except ImportError:
-        st.error("MoviePy library not found. Please add 'moviepy' to your requirements.txt file.")
+        # This will show if requirements.txt is missing or hasn't finished installing
+        st.error("MoviePy library not found. Please ensure 'moviepy' is in your requirements.txt and the app has finished deployment.")
+
+# Helper function to handle MoviePy v1 vs v2 method naming differences
+def apply_attribute(clip, attr_v1, attr_v2, value):
+    if hasattr(clip, attr_v2): # MoviePy v2.0+ (e.g., with_duration)
+        return getattr(clip, attr_v2)(value)
+    elif hasattr(clip, attr_v1): # MoviePy v1.0 (e.g., set_duration)
+        return getattr(clip, attr_v1)(value)
+    return clip
 
 # Page configuration
 st.set_page_config(page_title="Slideshow Generator", layout="centered")
@@ -42,28 +51,48 @@ if uploaded_files:
                             f.write(file.getbuffer())
                         temp_files.append(img_path)
 
-                        img_clip = ImageClip(img_path).set_duration(3)
+                        # Create Image Clip
+                        img_clip = ImageClip(img_path)
+                        img_clip = apply_attribute(img_clip, "set_duration", "with_duration", 3)
                         
+                        # Handle resolution/size
                         if img_clip.w is None or img_clip.w == 0:
-                            img_clip = img_clip.set_res((1280, 720))
+                            if hasattr(img_clip, "with_size"):
+                                img_clip = img_clip.with_size((1280, 720))
+                            else:
+                                img_clip = img_clip.set_res((1280, 720))
 
                         try:
-                            # Attempt to create text overlay
-                            txt_clip = TextClip(
-                                labels[i], 
-                                fontsize=50, 
-                                color='white', 
-                                bg_color='black',
-                                size=(img_clip.w, 100)
-                            ).set_duration(3).set_position(("center", "bottom"))
+                            # Handling TextClip arguments for v1 vs v2
+                            text_kwargs = {
+                                "text": labels[i],
+                                "color": 'white',
+                                "bg_color": 'black',
+                                "size": (img_clip.w, 100)
+                            }
+                            
+                            if hasattr(TextClip, "font_size"): # v2
+                                text_kwargs["font_size"] = 50
+                            else: # v1
+                                text_kwargs["fontsize"] = 50
+                                
+                            txt_clip = TextClip(**text_kwargs)
+                            txt_clip = apply_attribute(txt_clip, "set_duration", "with_duration", 3)
+                            
+                            # Set position
+                            if hasattr(txt_clip, "with_position"):
+                                txt_clip = txt_clip.with_position(("center", "bottom"))
+                            else:
+                                txt_clip = txt_clip.set_position(("center", "bottom"))
                             
                             video_segment = CompositeVideoClip([img_clip, txt_clip])
-                        except Exception:
-                            # Fallback if ImageMagick is not configured on server
+                        except Exception as e:
+                            st.warning(f"Text overlay failed for {labels[i]}. Image only used.")
                             video_segment = img_clip
 
                         clips.append(video_segment)
 
+                    # Combine and write
                     final_video = concatenate_videoclips(clips, method="compose")
                     output_path = "output_video.mp4"
                     
@@ -72,9 +101,10 @@ if uploaded_files:
                     st.success("✅ Video Generated!")
                     st.video(output_path)
 
+                    # Cleanup
                     for f in temp_files:
                         if os.path.exists(f):
                             os.remove(f)
 
                 except Exception as err:
-                    st.error(f"Error: {err}")
+                    st.error(f"Error during generation: {err}")
