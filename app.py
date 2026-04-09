@@ -12,6 +12,8 @@ except ImportError:
     except ImportError:
         # This will show if requirements.txt is missing or hasn't finished installing
         st.error("MoviePy library not found. Please ensure 'moviepy' is in your requirements.txt and the app has finished deployment.")
+        # Define placeholders to prevent NameError before the app stops
+        ImageClip = CompositeVideoClip = concatenate_videoclips = TextClip = None
 
 # Helper function to handle MoviePy v1 vs v2 method naming differences
 def apply_attribute(clip, attr_v1, attr_v2, value):
@@ -39,6 +41,8 @@ if uploaded_files:
     if st.button("🚀 Generate Video"):
         if not uploaded_files:
             st.error("Please upload some images first!")
+        elif concatenate_videoclips is None:
+            st.error("MoviePy is not properly installed. Check your requirements.txt")
         else:
             with st.spinner("Processing video... this might take a minute."):
                 try:
@@ -93,6 +97,7 @@ if uploaded_files:
                         clips.append(video_segment)
 
                     # Combine and write
+                    # Using the correctly imported concatenate_videoclips
                     final_video = concatenate_videoclips(clips, method="compose")
                     output_path = "output_video.mp4"
                     
