@@ -24,96 +24,167 @@ def apply_attribute(clip, attr_v1, attr_v2, value):
         return getattr(clip, attr_v1)(value)
     return clip
 
-# Function to create text overlay using Pillow (Works without ImageMagick)
+# Enhanced function to create high-quality text overlay using Pillow
 def create_text_overlay_pill(text, width, height):
-    # Create a transparent layer
+    # Create a transparent layer (RGBA)
     img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     
-    # Simple rectangle background for text at the bottom
-    rect_h = 80
-    draw.rectangle([0, height - rect_h, width, height], fill=(0, 0, 0, 180))
+    # Modern Gradient-like semi-transparent black bar
+    rect_h = int(height * 0.15)  # Responsive height
+    if rect_h < 60: rect_h = 60
     
-    # Try to use a default font
-    try:
-        # On most linux servers, this path exists
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
-    except:
+    # Draw a stylish semi-transparent overlay at the bottom
+    overlay_color = (0, 0, 0, 160) # Black with transparency
+    draw.rectangle([0, height - rect_h, width, height], fill=overlay_color)
+    
+    # Try multiple font paths common on Streamlit/Linux servers
+    font = None
+    font_size = int(rect_h * 0.5)
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "arial.ttf"
+    ]
+    
+    for path in font_paths:
+        try:
+            font = ImageFont.truetype(path, font_size)
+            break
+        except:
+            continue
+            
+    if font is None:
         font = ImageFont.load_default()
     
-    # Draw text
-    draw.text((width//2, height - rect_h//2), text, font=font, fill="white", anchor="mm")
+    # Draw text with a subtle shadow for better readability
+    text_pos = (width // 2, height - (rect_h // 2))
+    # Shadow
+    draw.text((text_pos[0]+2, text_pos[1]+2), text, font=font, fill=(0,0,0,255), anchor="mm")
+    # Main Text
+    draw.text(text_pos, text, font=font, fill="white", anchor="mm")
     
-    # Convert back to numpy array for MoviePy
     return np.array(img.convert('RGB'))
 
-# Page configuration
-st.set_page_config(page_title="Slideshow Generator", layout="centered")
+# Page configuration for a "High-End" look
+st.set_page_config(
+    page_title="Pro Slideshow Studio", 
+    page_icon="🎬", 
+    layout="wide"
+)
 
-st.title("📸 Slideshow Video Generator")
-st.info("Note: This version uses Pillow for text overlays to avoid ImageMagick errors.")
+# Custom Styling
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f5f7f9;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 10px;
+        height: 3em;
+        background-color: #FF4B4B;
+        color: white;
+        font-weight: bold;
+    }
+    .img-card {
+        background: white;
+        padding: 10px;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    </style>
+    """, unsafe_allow_stdio=True)
 
-uploaded_files = st.file_uploader("Upload Images", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
+st.title("🎬 Pro Slideshow Video Studio")
+st.markdown("---")
+
+# Layout with two columns
+col1, col2 = st.columns([1, 1])
+
+with col1:
+    st.subheader("📤 Step 1: Upload Your Media")
+    uploaded_files = st.file_uploader("Drop images here", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
+
+with col2:
+    st.subheader("⚙️ Step 2: Customize Labels")
+    labels = []
+    if uploaded_files:
+        for i, file in enumerate(uploaded_files):
+            label = st.text_input(f"Text for: {file.name}", key=f"input_{i}", value=f"Memory {i+1}")
+            labels.append(label)
+    else:
+        st.info("Upload images to start labeling.")
 
 if uploaded_files:
-    labels = []
-    st.subheader("Add Labels for your images")
-    
-    for i, file in enumerate(uploaded_files):
-        label = st.text_input(f"Label for {file.name}", key=f"input_{i}", value=f"Image {i+1}")
-        labels.append(label)
-
-    if st.button("🚀 Generate Video"):
-        if not uploaded_files:
-            st.error("Please upload some images first!")
-        elif concatenate_videoclips is None:
-            st.error("MoviePy is not properly installed.")
+    st.markdown("---")
+    if st.button("🚀 Generate High-Quality Video"):
+        if concatenate_videoclips is None:
+            st.error("MoviePy installation error. Please check requirements.txt")
         else:
-            with st.spinner("Processing video..."):
-                try:
-                    clips = []
-                    temp_files = []
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            try:
+                clips = []
+                temp_files = []
+                total_files = len(uploaded_files)
 
-                    for i, file in enumerate(uploaded_files):
-                        img_path = f"temp_{i}.jpg"
-                        with open(img_path, "wb") as f:
-                            f.write(file.getbuffer())
-                        temp_files.append(img_path)
+                for i, file in enumerate(uploaded_files):
+                    status_text.text(f"Processing image {i+1} of {total_files}...")
+                    
+                    img_path = f"temp_{i}.jpg"
+                    with open(img_path, "wb") as f:
+                        f.write(file.getbuffer())
+                    temp_files.append(img_path)
 
-                        # Load image with Pillow to get dimensions and add text
-                        main_img = Image.open(img_path).convert("RGB")
+                    # Process with Pillow
+                    with Image.open(img_path) as main_img:
+                        main_img = main_img.convert("RGB")
                         
-                        # Resize to a standard HD if too large or small
-                        main_img = main_img.resize((1280, 720))
+                        # High-quality resize (Maintain Aspect Ratio logic could be added, but 720p is safe)
+                        main_img = main_img.resize((1280, 720), Image.Resampling.LANCZOS)
                         w, h = main_img.size
                         
-                        # Add text using our custom function
-                        text_img_array = create_text_overlay_pill(labels[i], w, h)
+                        # Add Text Overlay
+                        text_layer = create_text_overlay_pill(labels[i], w, h)
                         
-                        # Combine main image and text bar (Simple merge)
-                        final_frame = Image.fromarray(text_img_array)
-                        main_img.paste(final_frame, (0,0), mask=Image.new('L', (w,h), 255))
+                        # Merge text bar onto image
+                        final_frame_pil = Image.fromarray(text_layer)
+                        main_img.paste(final_frame_pil, (0,0), mask=None) 
                         
-                        # Convert to MoviePy Clip
+                        # Convert to MoviePy
                         img_array = np.array(main_img)
                         img_clip = ImageClip(img_array)
                         img_clip = apply_attribute(img_clip, "set_duration", "with_duration", 3)
                         
                         clips.append(img_clip)
-
-                    # Combine and write
-                    final_video = concatenate_videoclips(clips, method="compose")
-                    output_path = "output_video.mp4"
                     
-                    final_video.write_videofile(output_path, fps=24, codec="libx264")
+                    progress_bar.progress((i + 1) / total_files * 0.5)
 
-                    st.success("✅ Video Generated!")
-                    st.video(output_path)
+                status_text.text("Merging clips into final video...")
+                final_video = concatenate_videoclips(clips, method="compose")
+                output_path = "final_slideshow.mp4"
+                
+                # Write file with professional settings
+                final_video.write_videofile(output_path, fps=24, codec="libx264", preset="medium")
+                progress_bar.progress(1.0)
+                
+                st.success("✨ Your video is ready!")
+                st.video(output_path)
+                
+                # Download Button
+                with open(output_path, "rb") as file:
+                    st.download_button(
+                        label="💾 Download Video",
+                        data=file,
+                        file_name="my_slideshow.mp4",
+                        mime="video/mp4"
+                    )
 
-                    # Cleanup
-                    for f in temp_files:
-                        if os.path.exists(f):
-                            os.remove(f)
+                # Cleanup
+                for f in temp_files:
+                    if os.path.exists(f): os.remove(f)
 
-                except Exception as err:
-                    st.error(f"Error during generation: {err}")
+            except Exception as err:
+                st.error(f"Something went wrong: {err}")
